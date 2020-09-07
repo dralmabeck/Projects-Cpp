@@ -1,13 +1,77 @@
 #include "linux_parser.h"
 
+// Custom string to long function to handle errors when function arguments are invalid
+long mystol(string input) {
+    long result;
+    try {
+        result = stol(input);
+    }
+    catch(...) {
+        result = 0;
+    }
+    return result;
+}
+
+// Use of template suggested by first reviewer
+template <typename T>
+T findValueByKey(string const &keyFilter, string const &filename) {
+
+    string line, key;
+    T value;
+
+    ifstream stream(LinuxParser::kProcDirectory + filename);
+    if (stream.is_open()) {
+        while (getline(stream, line)) {
+            istringstream linestream(line);
+            while (linestream >> key >> value) {
+                if (key == keyFilter) {
+                    return value;
+                }
+            }
+        }
+    }
+  return value;
+};
+
+// Use of template suggested by first reviewer
+template <typename T>
+T getValueOfFile(string const &filename) {
+
+    string line;
+    T value;
+
+    ifstream stream(LinuxParser::kProcDirectory + filename);
+    if (stream.is_open()) {
+        getline(stream, line);
+        istringstream linestream(line);
+        linestream >> value;
+    }
+
+    return value;
+};
+
+// Use of template suggested by first reviewer
+template <typename T>
+T getContentOfLine(string const &filename) {
+
+    string line;
+
+    ifstream stream(LinuxParser::kProcDirectory + filename);
+    if (stream.is_open()) {
+        getline(stream, line);
+    }
+
+    return line;
+};
+
 // DONE: An example of how to read data from the filesystem
 string LinuxParser::OperatingSystem() {
   string line;
   string key;
   string value;
-  ifstream filestream(kOSPath);
-  if (filestream.is_open()) {
-    while (getline(filestream, line)) {
+  ifstream stream(kOSPath);
+  if (stream.is_open()) {
+    while (getline(stream, line)) {
       replace(line.begin(), line.end(), ' ', '_');
       replace(line.begin(), line.end(), '=', ' ');
       replace(line.begin(), line.end(), '"', ' ');
@@ -25,14 +89,13 @@ string LinuxParser::OperatingSystem() {
 
 // DONE: An example of how to read data from the filesystem
 string LinuxParser::Kernel() {
+
   string os, version, kernel;
-  string line;
-  ifstream stream(kProcDirectory + kVersionFilename);
-  if (stream.is_open()) {
-    getline(stream, line);
-    istringstream linestream(line);
-    linestream >> os >> version >> kernel;
-  }
+  string line = getContentOfLine<string>(kVersionFilename);
+
+  istringstream linestream(line);
+  linestream >> os >> version >> kernel;
+
   return kernel;
 }
 
@@ -48,7 +111,7 @@ vector<int> LinuxParser::Pids() {
       string filename(file->d_name);
       if (std::all_of(filename.begin(), filename.end(), isdigit)) {
         int pid = stoi(filename);
-        pids.push_back(pid);
+        pids.emplace_back(pid);
       }
     }
   }
@@ -57,183 +120,91 @@ vector<int> LinuxParser::Pids() {
 }
 
 // DONE - TODO: Read and return the system memory utilization
-float LinuxParser::MemoryUtilization() { 
+// Read and return the system memory utilization
+double LinuxParser::MemoryUtilization() {
 
-    float total, free, buffer, cache;
-    string line, key, result;
-    ifstream stream(kProcDirectory + kMeminfoFilename);
-
-    if (stream.is_open()) {
-        while (getline(stream, line)) {
-            istringstream linestream(line);
-            while (linestream >> key >> result) {
-                if (key == "MemTotal:" ) {
-                    total = stof(result);
-                }
-                if (key == "MemFree:" ) {
-                    free = stof(result);
-                }
-                if (key == "Buffers:" ) {
-                     buffer = stof(result);
-                }
-                if (key == "Cached:" ) {
-                    cache = stof(result);
-                }
-            }
-        }
-    }
-  
-    return (1.0 - (free + buffer + cache) / total);
- }
+    double Total = findValueByKey<double>(filterMemTotalString, kMeminfoFilename);
+    double Free = findValueByKey<double>(filterMemFreeString, kMeminfoFilename);
+    return ((Total - Free) / Total);
+}
 
 // DONE - TODO: Read and return the system uptime
-long LinuxParser::UpTime() { 
-
-    string line, result;
-    ifstream stream(kProcDirectory + kUptimeFilename);
-
-    if (stream.is_open()) {
-        getline(stream, line);
-        istringstream linestream(line);
-        if (linestream >> result) {
-            return stol(result);
-        }
-    }
-
-    return 0;
+long LinuxParser::UpTime() {
+    return getValueOfFile<long>(kUptimeFilename);
 }
 
 // DONE - TODO: Read and return the number of active jiffies for a PID
 long LinuxParser::ActiveJiffies(int pid) { 
 
     vector<string> jiffies;
-    string line, key, result;
-    ifstream stream(kProcDirectory + to_string(pid) + kStatFilename);
+    long result;
+    string key;
+    string line = getContentOfLine<string>(to_string(pid) + kStatFilename);
+    istringstream linestream(line);
 
-    if (stream.is_open()) {
-        getline(stream, line);
-        istringstream linestream(line);
+    try {
         while (linestream >> key) {
-            jiffies.push_back(key);
+            jiffies.emplace_back(key);
         }
-        long result = stol(jiffies[13]) + stol(jiffies[14]) + stol(jiffies[15]) + stol(jiffies[16]);
-        return result;
+        result = (mystol(jiffies[13]) + mystol(jiffies[14]) + mystol(jiffies[15]) + mystol(jiffies[16]));
+    }
+    catch (...) {
+        result = 0;
     }
 
-    return 0;
- }
+    return result;
+}
 
 // DONE - TODO: Read and return CPU utilization
 vector<string> LinuxParser::CpuUtilization() { 
 
-    string line, key;
+    string line = getContentOfLine<string>(kStatFilename);
     vector<string> result;
-    ifstream stream(kProcDirectory + kStatFilename);
+    istringstream linestream(line);
+    string key;
 
-    if (stream.is_open()) {
-        getline(stream, line);
-        istringstream linestream(line);
-        while (linestream >> key) {
-            if (key != "cpu") {
-                result.push_back(key);
-            }
+    while (linestream >> key) {
+        if (key != filterCpu) {
+            result.emplace_back(key);
         }
     }
-
-  return result;
+    return result;
 }
 
 // DONE - TODO: Read and return the total number of processes
 int LinuxParser::TotalProcesses() { 
 
-    string line, key, result;
-    ifstream stream(kProcDirectory + kStatFilename);
-
-    if (stream.is_open()) {
-        while (getline(stream, line)) {
-            istringstream linestream(line);
-            while (linestream >> key >> result) {
-                if (key == "processes" ) {
-                    return stoi(result);
-                }
-            }
-        }
-    }
-
-  return 0;
+    return findValueByKey<int>(filterProcesses, kStatFilename);
 }
 
 // DONE - TODO: Read and return the number of running processes
 int LinuxParser::RunningProcesses() {
 
-    string line, key, result;
-    ifstream stream(kProcDirectory + kStatFilename);
-
-    if (stream.is_open()) {
-      while (getline(stream, line)) {
-        istringstream linestream(line);
-        while (linestream >> key >> result) {
-          if (key == "procs_running" ) {
-            return stoi(result);
-          }
-        }
-      }
-    }
-
-    return 0;
+    return findValueByKey<int>(filterRunningProcesses, kStatFilename);
 }
 
 // DONE - TODO: Read and return the command associated with a process
 string LinuxParser::Command(int pid) { 
 
-    string line;
-    ifstream stream(kProcDirectory + to_string(pid) + kCmdlineFilename);
-
-    if (stream.is_open()) {
-        getline(stream, line);
-        return line;
-    }
-
-    return to_string(0);
+    return string(getValueOfFile<string>(to_string(pid) + kCmdlineFilename));
 }
 
 // DONE - TODO: Read and return the memory used by a process
 string LinuxParser::Ram(int pid) {
 
-    string key, result;
-    ifstream stream(kProcDirectory + to_string(pid) + kStatusFilename);
+    // Here I am using VmData instead of VmSize as suggested by the first reviewer
+    // This is a deviation from Udacity Guidelines, but I want to show the physikcal Ram size
+    // VmSize would give me total Virtual Memory size (can exceed physical)
+    long result = findValueByKey<long>(filterProcMem, (to_string(pid)+kStatusFilename));
+    result = result / 1024;
 
-    if (stream.is_open()) {
-      while (stream >> key) {
-        if (key == "VmSize:" ) {
-          if (stream >> result) {
-            result = to_string(stol(result) / 1024);
-            return result;
-          }
-        }
-      }
-    }
-
-    return to_string(0);
+    return to_string(result);
 }
 
 // DONE - TODO: Read and return the user ID associated with a process
 string LinuxParser::Uid(int pid) { 
 
-    string line, key, result;
-    ifstream stream(kProcDirectory + to_string(pid) + kStatusFilename);
-
-    if (stream.is_open()) {
-        getline(stream, line);
-        istringstream linestream(line);
-        while (linestream >> key >> result) {
-            if (key == "Uid:" ) {
-                return result;
-            }
-        }
-    }
-
-    return to_string(0);
+    return findValueByKey<string>(filterUID, (to_string(pid)+kStatusFilename));
 }
 
 // DONE - TODO: Read and return the user associated with a process
@@ -261,13 +232,20 @@ string LinuxParser::User(int pid) {
 // DONE - TODO: Read and return the uptime of a process
 long LinuxParser::UpTime(int pid) { 
     
-    string a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, result;
-    ifstream stream(kProcDirectory + to_string(pid) + kStatFilename);
+    string result;
+    string line = getContentOfLine<string>(to_string(pid)+kStatFilename);
+    istringstream linestream(line);
 
-    if (stream.is_open()) {
-        stream >> a1 >> a2 >> a3 >> a4 >> a5 >> a6 >> a7 >> a8 >> a9 >> a10 >> a11 >> a12 >> a13 >> result;
-        return stol(result) / sysconf(_SC_CLK_TCK);
+    // Catch execption in case not all data is present in file
+    try {
+        for (int i=0; i<22; i++) {
+            linestream >> result;
+        }
     }
-
-    return 0;
+    catch (...) {
+        result = to_string(0);
+    }
+    
+    long upTimePid = UpTime() - mystol(result) / HERTZ;
+    return upTimePid;
  }

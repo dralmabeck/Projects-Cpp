@@ -3,5 +3,6 @@
 
 int main() {
   System system;
-  NCursesDisplay::Display(system);
+  int numberOfLines = 20;
+  NCursesDisplay::Display(system, numberOfLines);
 }

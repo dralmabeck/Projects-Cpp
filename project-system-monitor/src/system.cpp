@@ -12,7 +12,7 @@ vector<Process>& System::Processes() {
   // Loop over all PID's and insert into vector
   if (processes_.size() == 0) {
       for(int pid : pids) {
-          processes_.push_back(Process(pid));
+          processes_.emplace_back(pid);
       }
   }
 
@@ -27,7 +27,7 @@ vector<Process>& System::Processes() {
 string System::Kernel() { return string(LinuxParser::Kernel()); }
 
 // DONE - TODO: Return the system's memory utilization
-float System::MemoryUtilization() { return LinuxParser::MemoryUtilization(); }
+double System::MemoryUtilization() { return LinuxParser::MemoryUtilization(); }
 
 // DONE - TODO: Return the operating system name
 string System::OperatingSystem() { return string(LinuxParser::OperatingSystem()); }

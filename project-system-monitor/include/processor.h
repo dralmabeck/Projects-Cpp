@@ -5,7 +5,7 @@
 
 class Processor {
     public:
-     float Utilization();  // DONE - TODO: See src/processor.cpp
+     double Utilization();  // DONE - TODO: See src/processor.cpp
 };
 
 #endif

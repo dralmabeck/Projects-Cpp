@@ -4,21 +4,31 @@
 int Process::Pid() const { return pid; }
 
 // DONE - TODO: Return this process's CPU utilization
-float Process::CpuUtilization() const { 
+double Process::CpuUtilization() const { 
 
     // Calculate CPU utilization of single process according to following ressource
     // https://stackoverflow.com/questions/16726779/how-do-i-get-the-total-cpu-usage-of-an-application-from-proc-pid-stat/16736599#16736599
-    float active_jiffies = (float)LinuxParser::ActiveJiffies(pid);
-    float system_uptime = (float)LinuxParser::UpTime();
+    double active_jiffies = static_cast<double>(LinuxParser::ActiveJiffies(pid));
+    double system_uptime = static_cast<double>(LinuxParser::UpTime());
 
-    float seconds = system_uptime - UpTime() / HERTZ;
-    float result = (active_jiffies / HERTZ) / seconds;
+    double seconds = system_uptime - UpTime() / HERTZ;
+
+    // We are adding one second to keep denominator numerically stable
+    double result = (active_jiffies / HERTZ) / (seconds + 1.0);
 
     return result;
 }
 
 // DONE - TODO: Return the command that generated this process
-string Process::Command() const { return LinuxParser::Command(pid); }
+string Process::Command() const {
+    string command = LinuxParser::Command(pid);
+
+    if(command.size() > 40) {
+        command.resize(37);
+        command = command + "...";
+    }
+    return command;
+}
 
 // DONE - TODO: Return this process's memory utilization
 string Process::Ram() const { return LinuxParser::Ram(pid); }
